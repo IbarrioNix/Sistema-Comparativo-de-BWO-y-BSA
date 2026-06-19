@@ -299,22 +299,25 @@ for iter = 1:iteraciones
 
     % =====================================================================
     % ETAPA 4: MUTACIÓN
-    % La mutación opera sobre toda la población actual (sh, oh).
+    % La mutación opera sobre pop2 (resultado de procreación + canibalismo),
+    % no sobre la población del inicio de la iteración.
+    % Fiel al pseudocódigo del paper (Fig. 5): mutation step recibe pop2.
     % Se selecciona PM% de individuos y se intercambian dos posiciones
     % aleatorias de su vector sh (cambia el orden de colocación).
     % =====================================================================
 
-    Nmut = max(1, floor(PM * poblacion));
-    % Nmut = cuántos individuos van a mutar
-    % Ejemplo: poblacion=10, PM=0.4 -> 4 individuos mutan
+    Nmut = max(1, floor(PM * size(pop2_sh, 1)));
+    % Nmut = cuántos individuos de pop2 van a mutar
+    % Ejemplo: pop2 tiene ~8 individuos, PM=0.4 -> 3 individuos mutan
 
-    % Copiar la población actual para mutar sobre ella
-    pop3_sh  = sh;
-    pop3_oh  = oh;
-    cos3     = Costos;
+    % Copiar pop2 como base para mutar
+    pop3_sh  = pop2_sh;
+    pop3_oh  = pop2_oh;
+    cos3     = cos2(:)';
 
-    % Elegir Nmut individuos al azar (sin repetición)
-    idx_mutar = randperm(poblacion, min(Nmut, poblacion));
+    % Elegir Nmut individuos al azar (sin repetición) dentro de pop2
+    n_pop3 = size(pop3_sh, 1);
+    idx_mutar = randperm(n_pop3, min(Nmut, n_pop3));
 
     for k = 1:length(idx_mutar)
         ind_sh = pop3_sh(idx_mutar(k), :);
@@ -343,18 +346,15 @@ for iter = 1:iteraciones
 
     % =====================================================================
     % ETAPA 5: ACTUALIZACIÓN DE LA POBLACIÓN
-    % Combinar pop2 (padres + hijos vivos) con pop3 (población mutada),
-    % ordenar todo por costo y quedarse con los "poblacion" mejores.
+    % pop3 ya es pop2 con algunos individuos mutados (mutación in-place).
+    % Se ordena pop3 por costo y se seleccionan los "poblacion" mejores.
+    % Si pop3 tiene menos individuos que poblacion, se rellena aleatoriamente.
     % =====================================================================
 
-    pop_nueva_sh = [pop2_sh;  pop3_sh];
-    pop_nueva_oh = [pop2_oh;  pop3_oh];
-    cos_nueva    = [cos2(:);  cos3(:)];  % (:) fuerza columna en ambos casos
-
-    % Ordenar de mejor a peor
-    [cos_nueva_ord, idx_nueva_ord] = sort(cos_nueva);
-    sh_nueva_ord = pop_nueva_sh(idx_nueva_ord, :);
-    oh_nueva_ord = pop_nueva_oh(idx_nueva_ord, :);
+    % Ordenar pop3 de mejor a peor
+    [cos_nueva_ord, idx_nueva_ord] = sort(cos3(:));
+    sh_nueva_ord = pop3_sh(idx_nueva_ord, :);
+    oh_nueva_ord = pop3_oh(idx_nueva_ord, :);
 
     % Quedarse con los "poblacion" mejores individuos para la siguiente iteración
     if size(sh_nueva_ord, 1) >= poblacion
