@@ -203,7 +203,8 @@ for t = 1:iteraciones
     % Paper: Sección 2.4, Ecuaciones (8), (9) y (10)
     % =====================================================================
     % Para cada araña i:
-    %   a) Calcular R: vector de distancia escalado por 1/(2t). (Ec. 9)
+    %   a) Calcular R: norma escalar de la distancia combinada, escalada
+    %      por 1/(2t). (Ec. 9)
     %   b) Mover en dirección casi lineal con pequeña perturbación. (Ec. 8)
     %   c) Aceptar solo si mejora el fitness. (Ec. 10)
 
@@ -217,14 +218,19 @@ for t = 1:iteraciones
         XR_sh    = sh(idx_rand, :);
         XR_oh    = oh(idx_rand, :);
 
-        % Vector R (Ec. 9): combinación de X_best e X_Random, escalado por 1/(2t)
-        % Norma aplicada componente a componente (valor absoluto de cada dim.)
-        R_sh = abs( ((sh_best - I .* sh(i,:)) + (XR_sh - I .* sh(i,:))) / (2 * t) );
-        R_oh = abs( ((oh_best - I .* oh(i,:)) + (XR_oh - I .* oh(i,:))) / (2 * t) );
+        % R (Ec. 9): escalar = norma del vector de desplazamiento combinado,
+        % calculada sobre TODA la posición de la araña (sh y oh concatenados),
+        % escalada por 1/(2t). El paper define X_i como un vector m-dimensional
+        % único, así que la norma debe tomarse sobre esa dimensión completa,
+        % no por componente.
+        num_sh = (sh_best - I .* sh(i,:)) + (XR_sh - I .* sh(i,:));
+        num_oh = (oh_best - I .* oh(i,:)) + (XR_oh - I .* oh(i,:));
+        R = norm([num_sh, num_oh]) / (2 * t);   % R es un escalar
 
         % Nueva posición candidata (Ec. 8): movimiento casi lineal
-        new_sh_p2 = sh(i,:) + (1 - 2*r) .* R_sh;
-        new_oh_p2 = oh(i,:) + (1 - 2*r) .* R_oh;
+        % R escalar se broadcastea a cada componente del vector
+        new_sh_p2 = sh(i,:) + (1 - 2*r) .* R;
+        new_oh_p2 = oh(i,:) + (1 - 2*r) .* R;
 
         % Mantener valores en [0, 1]
         new_sh_p2 = min(max(new_sh_p2, 0), 1);

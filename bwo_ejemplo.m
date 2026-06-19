@@ -8,7 +8,7 @@ clear; clc;
 [N, a, b, L, W, f] = instancias("hard20");
 
 % ----- Parámetros compartidos de los algoritmos --------------------------
-poblacion   = 250;  % Número de arañas / soluciones candidatas
+poblacion   = 200;  % Número de arañas / soluciones candidatas
 iteraciones = 60;   % Número de iteraciones del bucle principal
 
 % =========================================================================
