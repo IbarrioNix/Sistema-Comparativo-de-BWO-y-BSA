@@ -1,10 +1,11 @@
-function [mx, my, mo, msec, mcosto] = bwo(N, a, b, L, W, f, poblacion, iteraciones)
+function [mx, my, mo, msec, mcosto] = bwo_cluster(N, a, b, L, W, f, poblacion, iteraciones)
 % =========================================================================
 % BWO_PLANTA - Black Widow Optimization adaptado a distribución de planta
 % =========================================================================
 % Trabaja directamente con:
 %   rpi()              -> convierte vector continuo en secuencia de instalaciones
-%   abanico()          -> coloca las instalaciones en el plano usando la secuencia
+%   Cluster_Lite()     -> coloca las instalaciones en el plano usando la secuencia
+%                         (Imam y Mir, 1998)
 %   funcion_objetivo() -> calcula el costo total con penalizaciones
 %
 % -------------------------------------------------------------------------
@@ -42,6 +43,12 @@ PM = 0.4;   % Tasa de mutación: fracción de individuos que mutan
 P  = 1e3;   % Penalización por solapamiento o salida de límites en la
             % función objetivo
 
+% Modo de colocación de la primera instalación en Cluster_Lite
+% "Esquina" -> esquina inf-izq (determinista, recomendado)
+% "Centro"  -> centro de la planta
+% "Aleatorio" -> posición aleatoria
+primer_bloque = "Esquina";
+
 % -------------------------------------------------------------------------
 % ETAPA 1: INICIALIZACIÓN DE LA POBLACIÓN
 % -------------------------------------------------------------------------
@@ -70,8 +77,8 @@ for p = 1:poblacion
     secuencia(p,:) = rpi(sh(p,:));          % Ordenar sh -> permutación de instalaciones
     o(p,:)         = double(oh(p,:) > 0.5); % oh > 0.5 significa rotar la instalación
 
-    % Colocar instalaciones con la heurística abanico y calcular su costo
-    [x(p,:), y(p,:)] = abanico(N, a, b, L, W, o(p,:), secuencia(p,:));
+    % Colocar instalaciones con Cluster_Lite y calcular su costo
+    [x(p,:), y(p,:)] = Cluster_Lite(secuencia(p,:), a, b, L, W, o(p,:), f, N, [], P, primer_bloque);
     Costos(p) = funcion_objetivo(N, a, b, L, W, x(p,:), y(p,:), o(p,:), f, P);
 end
 
@@ -82,7 +89,7 @@ my   = y(idx_mejor, :);
 mo   = o(idx_mejor, :);
 msec = secuencia(idx_mejor, :);
 
-fprintf('=== BWO iniciado | Poblacion: %d | Iteraciones: %d ===\n', poblacion, iteraciones);
+fprintf('=== BWO Cluster iniciado | Poblacion: %d | Iteraciones: %d ===\n', poblacion, iteraciones);
 fprintf('Iter %4d de %4d | Mejor costo inicial: $%.3f\n', 0, iteraciones, mcosto);
 
 % -------------------------------------------------------------------------
@@ -208,13 +215,13 @@ for iter = 1:iteraciones
             % Decodificar y evaluar Hijo 1
             sec1 = rpi(hijo1_sh);
             o1   = double(hijo1_oh > 0.5);
-            [x1, y1] = abanico(N, a, b, L, W, o1, sec1);
+            [x1, y1] = Cluster_Lite(sec1, a, b, L, W, o1, f, N, [], P, primer_bloque);
             c1 = funcion_objetivo(N, a, b, L, W, x1, y1, o1, f, P);
 
             % Decodificar y evaluar Hijo 2
             sec2 = rpi(hijo2_sh);
             o2   = double(hijo2_oh > 0.5);
-            [x2, y2] = abanico(N, a, b, L, W, o2, sec2);
+            [x2, y2] = Cluster_Lite(sec2, a, b, L, W, o2, f, N, [], P, primer_bloque);
             c2 = funcion_objetivo(N, a, b, L, W, x2, y2, o2, f, P);
 
             % Acumular hijos de esta repetición
@@ -340,7 +347,7 @@ for iter = 1:iteraciones
         % Evaluar el individuo mutado
         sec_m = rpi(ind_sh);
         o_m   = double(ind_oh > 0.5);
-        [xm, ym] = abanico(N, a, b, L, W, o_m, sec_m);
+        [xm, ym] = Cluster_Lite(sec_m, a, b, L, W, o_m, f, N, [], P, primer_bloque);
         cos3(idx_mutar(k)) = funcion_objetivo(N, a, b, L, W, xm, ym, o_m, f, P);
     end
 
@@ -372,7 +379,7 @@ for iter = 1:iteraciones
             oh_new = rand(1, N);
             sec_e  = rpi(sh_new);
             o_e    = double(oh_new > 0.5);
-            [xe, ye] = abanico(N, a, b, L, W, o_e, sec_e);
+            [xe, ye] = Cluster_Lite(sec_e, a, b, L, W, o_e, f, N, [], P, primer_bloque);
             ce = funcion_objetivo(N, a, b, L, W, xe, ye, o_e, f, P);
             sh     = [sh;     sh_new]; %#ok<AGROW>
             oh     = [oh;     oh_new]; %#ok<AGROW>
@@ -392,14 +399,14 @@ for iter = 1:iteraciones
         % Decodificar el mejor individuo de esta iteración
         msec = rpi(sh(idx_iter, :));
         mo   = double(oh(idx_iter, :) > 0.5);
-        [mx, my] = abanico(N, a, b, L, W, mo, msec);
+        [mx, my] = Cluster_Lite(msec, a, b, L, W, mo, f, N, [], P, primer_bloque);
     end
 
     fprintf('Iteracion: %d, de %d. Mejor costo: $%.3f\n', iter, iteraciones, mcosto);
 
 end % fin del bucle principal
 
-fprintf('\n=== BWO finalizado ===\n');
+fprintf('\n=== BWO Cluster finalizado ===\n');
 fprintf('Mejor costo encontrado: $%.3f\n', mcosto);
 
 end % fin de la función

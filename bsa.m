@@ -26,7 +26,7 @@ function [mx, my, mo, msec, mcosto] = bsa(N, a, b, L, W, f, poblacion, iteracion
 %   2. FASE DE EXPLOTACIÓN: ataque de corto alcance, casi lineal, hacia la
 %      mejor presa detectada en la vecindad inmediata.
 %      Ec. (8): X_i^P2 = X_i + (1 - 2*r) * R
-%      Ec. (9): R = ||(X_best - I*X_i) + (X_Random - I*X_i)|| / (2*t)
+%      Ec. (9): R = [(X_best - I*X_i) + (X_Random - I*X_i)] / (2*t)  -> vector componente a componente
 %
 % En ambas fases se acepta la nueva posición solo si mejora el fitness
 % (criterio greedy, Ec. 7 y 10 del paper).
@@ -160,13 +160,17 @@ for t = 1:iteraciones
         XR_sh     = sh(idx_rand, :);
         XR_oh     = oh(idx_rand, :);
 
-        % DeltaX_Random (Ec. 6): perturbación de zigzag
+        % DeltaX_Random (Ec. 6): perturbacion de zigzag (solo para sh)
         Delta_sh = kr * sin(pi/2 * r) .* (XR_sh - I .* sh(i,:));
-        Delta_oh = kr * sin(pi/2 * r) .* (XR_oh - I .* oh(i,:));
 
-        % Nueva posición candidata (Ec. 5)
+        % Nueva posicion candidata de secuencia (Ec. 5)
         new_sh_p1 = sh(i,:) + r .* (NL_sh - I .* sh(i,:)) + Delta_sh;
-        new_oh_p1 = oh(i,:) + r .* (NL_oh - I .* oh(i,:)) + Delta_oh;
+
+        % oh: perturbacion gaussiana centrada para evitar colapso a extremos.
+        % Las Ecs. (5)-(6) con I=2 empujan oh fuera de [0,1] y el clipping
+        % acumula todos los valores en 0 o 1, colapsando las orientaciones.
+        % Una perturbacion gaussiana pequena preserva la diversidad binaria.
+        new_oh_p1 = oh(i,:) + 0.1 * randn(1, N);
 
         % Mantener valores en [0, 1] (bounds del espacio continuo)
         new_sh_p1 = min(max(new_sh_p1, 0), 1);
@@ -218,19 +222,21 @@ for t = 1:iteraciones
         XR_sh    = sh(idx_rand, :);
         XR_oh    = oh(idx_rand, :);
 
-        % R (Ec. 9): escalar = norma del vector de desplazamiento combinado,
-        % calculada sobre TODA la posición de la araña (sh y oh concatenados),
-        % escalada por 1/(2t). El paper define X_i como un vector m-dimensional
-        % único, así que la norma debe tomarse sobre esa dimensión completa,
-        % no por componente.
-        num_sh = (sh_best - I .* sh(i,:)) + (XR_sh - I .* sh(i,:));
-        num_oh = (oh_best - I .* oh(i,:)) + (XR_oh - I .* oh(i,:));
-        R = norm([num_sh, num_oh]) / (2 * t);   % R es un escalar
+        % R (Ec. 9): VECTOR de desplazamiento combinado, calculado por
+        % componente, escalado por 1/(2t). El paper usa notación de norma
+        % pero R en la Ec. (8) se aplica componente a componente (un vector
+        % de dimensión m), lo que preserva la variabilidad individual de
+        % cada dimensión. Tratar R como escalar colapsa sh y oh a valores
+        % uniformes, causando que todas las orientaciones converjan a 0 o 1.
+        num_sh = ((sh_best - I .* sh(i,:)) + (XR_sh - I .* sh(i,:))) / (2 * t);
 
-        % Nueva posición candidata (Ec. 8): movimiento casi lineal
-        % R escalar se broadcastea a cada componente del vector
-        new_sh_p2 = sh(i,:) + (1 - 2*r) .* R;
-        new_oh_p2 = oh(i,:) + (1 - 2*r) .* R;
+        % Nueva posicion candidata de secuencia (Ec. 8): movimiento casi lineal.
+        new_sh_p2 = sh(i,:) + (1 - 2*r) .* num_sh;
+
+        % oh en explotacion: misma estrategia que en exploracion.
+        % El vector num_oh puede ser grande en iteraciones iniciales (t pequeno)
+        % y colapsar todas las orientaciones al mismo extremo via clipping.
+        new_oh_p2 = oh(i,:) + 0.05 * randn(1, N);
 
         % Mantener valores en [0, 1]
         new_sh_p2 = min(max(new_sh_p2, 0), 1);
