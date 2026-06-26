@@ -152,54 +152,33 @@ for iter = 1:iteraciones
         end
 
         % ------------------------------------------------------------------
-        % CRUCE ARITMÉTICO — el paper repite la Ecuación 1 exactamente
-        % Nvar/2 veces usando posiciones NO duplicadas del vector alpha.
+        % CRUCE ARITMÉTICO — Ecuación 1 del paper (Hayyolalam & Pourhaji, 2020)
         %
-        % Interpretación fiel: en cada repetición k se genera un nuevo alpha
-        % aleatorio (distinto por construcción al ser rand independiente) y
-        % se producen 2 hijos. Con Nvar/2 repeticiones, la pareja genera en
-        % total Nvar hijos (Nvar/2 pares), explorando el espacio de forma
-        % más amplia que con una sola aplicación de la ecuación.
+        %   y1 = alpha .* x1 + (1 - alpha) .* x2
+        %   y2 = alpha .* x2 + (1 - alpha) .* x1
         %
-        % "randomly selected numbers should not be duplicated" → usamos
-        % randperm para elegir qué posiciones de alpha son "activas" en
-        % cada repetición, garantizando que no se repita ninguna posición
-        % a lo largo de las Nvar/2 iteraciones del cruce.
+        % Se repite Nvar/2 veces, generando un alpha nuevo e independiente
+        % en cada repetición. Cada alpha es un vector completo en [0,1]^N,
+        % y se aplica a TODAS las posiciones del vector (sin máscara).
+        % La condición "randomly selected numbers should not be duplicated"
+        % del paper se refiere a que cada alpha es una muestra fresca e
+        % independiente, no la reutilización del mismo vector.
         % ------------------------------------------------------------------
 
         Nrep = max(1, floor(N / 2));  % número de repeticiones = Nvar/2
 
-        % Construir un orden aleatorio de posiciones sin repetición,
-        % que se distribuye entre las Nrep repeticiones del cruce.
-        pos_orden = randperm(N);      % permutación aleatoria de 1..N
-
         for k = 1:Nrep
-            % alpha independiente para cada repetición (continuo en [0,1])
+            % Nuevo alpha aleatorio completo para cada repetición
             alpha_sh = rand(1, N);
             alpha_oh = rand(1, N);
 
-            % "Activar" solo las posiciones asignadas a esta repetición k.
-            % Cada repetición recibe 2 posiciones del pos_orden sin solaparse.
-            i_pos = pos_orden(2*k - 1);
-            j_pos = pos_orden(min(2*k, N));  % min() protege si N es impar
+            % Hijo 1: mezcla aritmética completa (Ec. 1, término y1)
+            hijo1_sh = alpha_sh .* hembra_sh + (1 - alpha_sh) .* macho_sh;
+            hijo1_oh = alpha_oh .* hembra_oh + (1 - alpha_oh) .* macho_oh;
 
-            % Máscara binaria: solo las dos posiciones activas usan alpha;
-            % el resto copia directamente de hembra/macho sin mezcla.
-            mascara = zeros(1, N);
-            mascara(i_pos) = 1;
-            mascara(j_pos) = 1;
-
-            % Hijo 1: mezcla solo en posiciones activas, copia en el resto
-            hijo1_sh = mascara .* (alpha_sh .* hembra_sh + (1 - alpha_sh) .* macho_sh) ...
-                     + (1 - mascara) .* hembra_sh;
-            hijo1_oh = mascara .* (alpha_oh .* hembra_oh + (1 - alpha_oh) .* macho_oh) ...
-                     + (1 - mascara) .* hembra_oh;
-
-            % Hijo 2: mezcla simétrica solo en posiciones activas
-            hijo2_sh = mascara .* (alpha_sh .* macho_sh + (1 - alpha_sh) .* hembra_sh) ...
-                     + (1 - mascara) .* macho_sh;
-            hijo2_oh = mascara .* (alpha_oh .* macho_oh + (1 - alpha_oh) .* hembra_oh) ...
-                     + (1 - mascara) .* macho_oh;
+            % Hijo 2: mezcla simétrica completa (Ec. 1, término y2)
+            hijo2_sh = alpha_sh .* macho_sh + (1 - alpha_sh) .* hembra_sh;
+            hijo2_oh = alpha_oh .* macho_oh + (1 - alpha_oh) .* hembra_oh;
 
             % Mantener oh acotado en [0,1] (representa probabilidad de rotación)
             hijo1_oh = max(0, min(1, hijo1_oh));

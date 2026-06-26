@@ -22,6 +22,9 @@ function [mx, my, mo, msec, mcosto] = bsa(N, a, b, L, W, f, poblacion, iteracion
 %      posiciones prometedoras con perturbación estocástica en zigzag.
 %      Ec. (5): X_i^P1 = X_i + r*(NL_i - I*X_i) + DeltaX_Random
 %      Ec. (6): DeltaX_Random = kr * sin(pi/2 * r) * (X_Random - I*X_i)
+%      Ec. (4): NL_i = Select from { X_best U Xj | fj < fi }
+%               Pool construido con find() (sin loop interno) y sin duplicar
+%               X_best si ya aparece entre los mejores (conjunto sin repetidos).
 %
 %   2. FASE DE EXPLOTACIÓN: ataque de corto alcance, casi lineal, hacia la
 %      mejor presa detectada en la vecindad inmediata.
@@ -137,19 +140,19 @@ for t = 1:iteraciones
     for i = 1:poblacion
 
         % -- (a) Selección del candidato NL_i (Ec. 4) ---------------------
-        % Candidatos: X_best + todas las arañas j con Costo(j) < Costo(i)
-        candidatos_sh = sh_best;   % iniciar con X_best
-        candidatos_oh = oh_best;
-        for j = 1:poblacion
-            if j ~= i && Costos(j) < Costos(i)
-                candidatos_sh = [candidatos_sh; sh(j,:)]; %#ok<AGROW>
-                candidatos_oh = [candidatos_oh; oh(j,:)]; %#ok<AGROW>
-            end
-        end
+        % Candidatos: X_best + todas las arañas j (j ~= i) con Costo(j) < Costo(i).
+        % Se usa find() para identificar índices en una sola operación vectorial,
+        % evitando el crecimiento dinámico del array dentro del loop (más eficiente
+        % en MATLAB). X_best se añade solo si no coincide con alguno de los
+        % candidatos, respetando la semántica de conjunto sin duplicados de Ec. (4):
+        %   NL_i = Select from { X_best ∪ Xj | fj < fi }
+        mejores_idx = find(Costos < Costos(i) & (1:poblacion) ~= i);
+        pool_sh = [sh_best; sh(mejores_idx, :)];
+        pool_oh = [oh_best; oh(mejores_idx, :)];
         % Seleccionar uno al azar del pool de candidatos
-        idx_nl = randi(size(candidatos_sh, 1));
-        NL_sh  = candidatos_sh(idx_nl, :);
-        NL_oh  = candidatos_oh(idx_nl, :);
+        idx_nl = randi(size(pool_sh, 1));
+        NL_sh  = pool_sh(idx_nl, :);
+        NL_oh  = pool_oh(idx_nl, :);
 
         % -- (b) Actualización con zigzag (Ec. 5 y 6) ---------------------
         r = rand();                          % r ∈ [0,1] (Ec. 5)
@@ -184,9 +187,13 @@ for t = 1:iteraciones
 
         % Aceptar solo si mejora (Ec. 7: greedy acceptance)
         if costo_p1 < Costos(i)
-            sh(i,:)    = new_sh_p1;
-            oh(i,:)    = new_oh_p1;
-            Costos(i)  = costo_p1;
+            sh(i,:)        = new_sh_p1;
+            oh(i,:)        = new_oh_p1;
+            o(i,:)         = o_p1;         % FIX: sincronizar orientación decodificada
+            x(i,:)         = xp1;          % FIX: sincronizar posición X decodificada
+            y(i,:)         = yp1;          % FIX: sincronizar posición Y decodificada
+            secuencia(i,:) = sec_p1;       % FIX: sincronizar secuencia decodificada
+            Costos(i)      = costo_p1;
         end
 
     end % fin exploración
@@ -250,9 +257,13 @@ for t = 1:iteraciones
 
         % Aceptar solo si mejora (Ec. 10: greedy acceptance)
         if costo_p2 < Costos(i)
-            sh(i,:)   = new_sh_p2;
-            oh(i,:)   = new_oh_p2;
-            Costos(i) = costo_p2;
+            sh(i,:)        = new_sh_p2;
+            oh(i,:)        = new_oh_p2;
+            o(i,:)         = o_p2;         % FIX: sincronizar orientación decodificada
+            x(i,:)         = xp2;          % FIX: sincronizar posición X decodificada
+            y(i,:)         = yp2;          % FIX: sincronizar posición Y decodificada
+            secuencia(i,:) = sec_p2;       % FIX: sincronizar secuencia decodificada
+            Costos(i)      = costo_p2;
         end
 
     end % fin explotación

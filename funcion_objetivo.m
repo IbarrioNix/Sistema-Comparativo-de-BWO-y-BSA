@@ -53,7 +53,7 @@ w = b .* o + a .* (1-o);   % Dimensión en Y de cada instalación (tras rotar)
 
 d = zeros(N,N);
 
-for i = 1:N-1 
+for i = 1:N-1
     for j = i+1:N
         d(i,j) = abs(x(i)-x(j)) + abs(y(i)-y(j));
     end
@@ -65,27 +65,35 @@ end
 % B(i,j) = 1 si el par (i,j) tiene alguna infeasibilidad, 0 si es válido
 %
 % Dos tipos de infeasibilidad:
-%   A) solapa_lim: la instalación i se sale de los límites de la planta
-%      El centro x(i) debe estar a al menos l(i)/2 de los bordes en X,
-%      y y(i) debe estar a al menos w(i)/2 de los bordes en Y.
-%      Es decir:  x(i) in [l(i)/2,  L - l(i)/2]
-%                 y(i) in [w(i)/2,  W - w(i)/2]
+%   A) solapa_lim: la instalación i O j se sale de los límites de la planta
+%      El centro x(k) debe estar en [l(k)/2,  L - l(k)/2]
+%      El centro y(k) debe estar en [w(k)/2,  W - w(k)/2]
+%
+%      FIX: el original solo verificaba i, dejando sin penalizar los pares
+%      donde únicamente j estaba fuera de límites.
 %
 %   B) solapa_ins: las instalaciones i y j se solapan entre sí
 %      Dos rectángulos con centros (x(i),y(i)) y (x(j),y(j)) se solapan si:
 %        |x(i)-x(j)| < (l(i)+l(j))/2   Y   |y(i)-y(j)| < (w(i)+w(j))/2
-%      (condición SAT: solapan en X *y* en Y simultáneamente)
 
 B = zeros(N,N);
 
 for i = 1:N
     for j = i+1:N
 
-        % -- Verificar si la instalación i se sale de la planta --
-        solapa_lim = x(i) < 0.5 * l(i)     || ...  % borde izquierdo
-                     x(i) > L - 0.5 * l(i) || ...  % borde derecho
-                     y(i) < 0.5 * w(i)     || ...  % borde inferior
-                     y(i) > W - 0.5 * w(i);         % borde superior
+        % -- FIX: Verificar si la instalación i se sale de la planta --
+        solapa_lim_i = x(i) < 0.5 * l(i)     || ...
+                       x(i) > L - 0.5 * l(i) || ...
+                       y(i) < 0.5 * w(i)     || ...
+                       y(i) > W - 0.5 * w(i);
+
+        % -- FIX: Verificar si la instalación j se sale de la planta --
+        solapa_lim_j = x(j) < 0.5 * l(j)     || ...
+                       x(j) > L - 0.5 * l(j) || ...
+                       y(j) < 0.5 * w(j)     || ...
+                       y(j) > W - 0.5 * w(j);
+
+        solapa_lim = solapa_lim_i || solapa_lim_j;
 
         % -- Verificar si i y j se solapan entre sí --
         dx = abs(x(i) - x(j));         % Distancia entre centros en X
@@ -112,8 +120,6 @@ end
 % Para cada par (i,j) con flujo f(i,j) > 0:
 %   - Si no hay infeasibilidad (B=0): costo = f(i,j) * d(i,j)
 %   - Si hay infeasibilidad  (B=1): costo = f(i,j) * (1 + P) * d(i,j)
-%     -> El factor (1+P) encarece fuertemente las soluciones inválidas,
-%        dirigiendo al algoritmo a evitarlas sin descartar la solución por completo
 
 C = sum(sum(f .* (1 + P .* B) .* d));
 
